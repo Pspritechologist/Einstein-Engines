@@ -59,7 +59,6 @@ public sealed class TestIterasmSystem : EntitySystem
         {
             if (paper.Content != string.Empty)
             {
-                Log.Debug($"TestIterasmSystem: Compiling Iterasm for {ent} with content: {paper.Content}");
                 iterasm.IterasmState.Compile(paper.Content);
                 iterasm.CurrentState = ExecutionState.Running;
                 iterasm.NextExecution = _timing.CurTime + TimeSpan.FromMilliseconds(iterasm.ExecuteTime);
@@ -68,7 +67,6 @@ public sealed class TestIterasmSystem : EntitySystem
 
         if (paper.Content == string.Empty)
         {
-            Log.Debug($"TestIterasmSystem: Paper content is empty, setting state to Idle for {ent}");
             iterasm.CurrentState = ExecutionState.Idle;
             return;
         }
@@ -93,6 +91,8 @@ public sealed class TestIterasmSystem : EntitySystem
 
         if (iterasm.CurrentState == ExecutionState.Running)
             iterasm.IterasmState.Vm?.RunStep();
+
+        iterasm.Pc = iterasm.IterasmState.State?.Pc ?? 0;
     }
 
     private void OnSignalReceived(Entity<TestIterasmComponent> ent, ref SignalReceivedEvent args)
@@ -133,7 +133,8 @@ public sealed class TestIterasmState(TestIterasmComponent comp) : Iterasm.Iteras
 
         _comp.OutgoingQueue.Enqueue((port, value));
 
-        return state.Increment();
+        // return state.Increment();
+        return true;
     }
 
     private bool TryReceive(Iterasm.State state, long args)
@@ -151,7 +152,8 @@ public sealed class TestIterasmState(TestIterasmComponent comp) : Iterasm.Iteras
             PutSignal(state, port, reg, value);
         }
 
-        return state.Increment();
+        // return state.Increment();
+        return true;
     }
 
     private bool Receive(Iterasm.State state, long args)
@@ -170,7 +172,8 @@ public sealed class TestIterasmState(TestIterasmComponent comp) : Iterasm.Iteras
         }
 
 
-        return state.Increment();
+        // return state.Increment();
+        return true;
     }
 
     public static void PutSignal(Iterasm.State state, string port, ushort reg, long value)

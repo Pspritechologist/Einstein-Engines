@@ -18,6 +18,10 @@ public sealed partial class TestIterasmComponent : Component
 
     [ViewVariables(VVAccess.ReadOnly)]
     public ExecutionState CurrentState = ExecutionState.Idle;
+
+    // Purely for debugging.
+    [ViewVariables(VVAccess.ReadOnly)]
+    public ulong Pc = 0;
 }
 
 public enum ExecutionState
