@@ -12,6 +12,7 @@
     <WarningsAsErrors>nullable</WarningsAsErrors>
     <Nullable>enable</Nullable>
     <ServerGarbageCollection>true</ServerGarbageCollection>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="JetBrains.Annotations" PrivateAssets="All" />

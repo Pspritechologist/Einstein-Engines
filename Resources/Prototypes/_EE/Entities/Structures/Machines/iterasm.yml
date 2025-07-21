@@ -1,0 +1,28 @@
+- type: entity
+  name: owo
+  parent: BaseComputer
+  id: TestIterasmMachine
+  components:
+  - type: TestIterasm
+
+  - type: Paper
+  - type: ActivatableUI
+    key: enum.PaperUiKey.Key
+    requiresComplex: false
+  - type: UserInterface
+    interfaces:
+      enum.PaperUiKey.Key:
+        type: PaperBoundUserInterface
+
+  - type: DeviceLinkSink
+    ports:
+      - Close
+      - DoorBolt
+      - Trigger
+  - type: DeviceLinkSource
+    ports:
+      - Start
+      - Output
+      - AirDanger
+  - type: SoundOnOverload
+  - type: SpawnOnOverload
