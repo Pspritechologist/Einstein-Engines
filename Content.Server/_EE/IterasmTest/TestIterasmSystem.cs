@@ -1,10 +1,14 @@
-using System.Text;
+using Content.Server._EE.Iterasm;
 using Content.Server.DeviceLinking.Events;
 using Content.Server.Popups;
 using Content.Shared.DeviceLinking;
 using Content.Shared.DeviceNetwork;
 using Content.Shared.Paper;
+using Robust.Shared.Audio;
+using Robust.Shared.Audio.Systems;
+using Robust.Shared.Random;
 using Robust.Shared.Timing;
+using System.Text;
 
 namespace Content.Server._EE.IterasmTest;
 
@@ -14,11 +18,13 @@ public sealed class TestIterasmSystem : EntitySystem
 
     [Dependency] private readonly PopupSystem _popupSystem = default!;
     [Dependency] private readonly IGameTiming _timing = default!;
+    [Dependency] private readonly IRobustRandom _random = default!;
     [Dependency] private readonly SharedDeviceLinkSystem _signal = default!;
+    [Dependency] private readonly SharedAudioSystem _audio = default!;
 
     public override void Initialize()
     {
-        SubscribeLocalEvent<TestIterasmComponent, ComponentInit>((ent, comp, ev) => comp.IterasmState = new(comp));
+        SubscribeLocalEvent<TestIterasmComponent, ComponentInit>((ent, comp, ev) => comp.IterasmState = new(_timing, _random, Log, comp));
         SubscribeLocalEvent<TestIterasmComponent, ComponentRemove>((ent, comp, ev) => comp.IterasmState?.Dispose());
         SubscribeLocalEvent<TestIterasmComponent, SignalReceivedEvent>(OnSignalReceived);
 
@@ -42,6 +48,9 @@ public sealed class TestIterasmSystem : EntitySystem
     {
         var iterasm = ent.Comp;
 
+        if (iterasm.CurrentState is ExecutionState.Busted or ExecutionState.Halted)
+            iterasm.OutgoingQueue.Clear();
+
         while (iterasm.OutgoingQueue.TryDequeue(out var item))
         {
             var (port, value) = item;
@@ -55,19 +64,31 @@ public sealed class TestIterasmSystem : EntitySystem
         var iterasm = ent.Comp1;
         var paper = ent.Comp2;
 
-        if (iterasm.CurrentState == ExecutionState.Idle)
+        if (iterasm.CurrentState is ExecutionState.Halted && paper.Content != string.Empty)
         {
-            if (paper.Content != string.Empty)
+            try
             {
                 iterasm.IterasmState.Compile(paper.Content);
                 iterasm.CurrentState = ExecutionState.Running;
-                iterasm.NextExecution = _timing.CurTime + TimeSpan.FromMilliseconds(iterasm.ExecuteTime);
+                iterasm.NextExecution = _timing.CurTime + TimeSpan.FromMilliseconds(1000.0 / iterasm.ExecutionsPerSecond);
+                _audio.PlayPvs(new SoundPathSpecifier("/Audio/Items/genhit.ogg"), ent.Owner);
+            }
+            catch (Iterasm.Binds.CompilationException e)
+            {
+                _popupSystem.PopupEntity(
+                    $"Compilation error: {e.Kind} at line {e.ErrorLine}",
+                    ent.Owner,
+                    Shared.Popups.PopupType.MediumCaution
+                );
+                _audio.PlayPvs(new SoundPathSpecifier("/Audio/Items/Defib/defib_failed.ogg"), ent.Owner);
+                iterasm.CurrentState = ExecutionState.Busted;
             }
         }
 
         if (paper.Content == string.Empty)
         {
-            iterasm.CurrentState = ExecutionState.Idle;
+            // _audio.PlayPvs(new SoundPathSpecifier("/Audio/Weapons/Guns/MagOut/sfrifle_magout.ogg"), ent.Owner);
+            iterasm.CurrentState = ExecutionState.Halted;
             return;
         }
     }
@@ -79,25 +100,47 @@ public sealed class TestIterasmSystem : EntitySystem
         if (iterasm.NextExecution > _timing.CurTime)
             return;
 
-        iterasm.NextExecution = _timing.CurTime + TimeSpan.FromMilliseconds(iterasm.ExecuteTime);
+        iterasm.NextExecution = _timing.CurTime + TimeSpan.FromMilliseconds(1000.0 / iterasm.ExecutionsPerSecond);
 
         if (iterasm.CurrentState == ExecutionState.WaitingForSignal && iterasm.IncomingQueue.Count > 0)
         {
             var (port, value) = iterasm.IncomingQueue.Dequeue();
 
-            TestIterasmState.PutSignal((Iterasm.State) iterasm.IterasmState.State!, port, iterasm.RequestedRegister, value);
+            TestIterasmState.PutSignal((VmState) iterasm.IterasmState.State!, port, iterasm.RequestedRegister, value);
             iterasm.CurrentState = ExecutionState.Running;
         }
 
         if (iterasm.CurrentState == ExecutionState.Running)
-            iterasm.IterasmState.Vm?.RunStep();
+        {
+            try
+            {
+                var timePast = iterasm.NextExecution - _timing.CurTime;
+                var stepsToRun = timePast.TotalMilliseconds / (1000.0 / iterasm.ExecutionsPerSecond);
+                if (stepsToRun > 1)
+                    Console.WriteLine($"Running {stepsToRun - 1} steps behind!");
+                iterasm.IterasmState.Vm.RunSteps((nuint) stepsToRun);
+                _audio.PlayPvs(new SoundPathSpecifier("/Audio/Weapons/Guns/Empty/empty.ogg"), ent.Owner);
+            }
+            catch (Iterasm.Binds.IterasmRuntimeErrorException e)
+            {
+                _popupSystem.PopupEntity($"Runtime error: {e.Message}", ent.Owner, Shared.Popups.PopupType.MediumCaution);
+                _audio.PlayPvs(new SoundPathSpecifier("/Audio/Items/Defib/defib_failed.ogg"), ent.Owner);
 
-        iterasm.Pc = iterasm.IterasmState.State?.Pc ?? 0;
+                iterasm.CurrentState = ExecutionState.Busted;
+
+                return;
+            }
+
+            iterasm.Pc = iterasm.IterasmState.State?.Pc ?? 0;
+        }
+        else
+            iterasm.Pc = 0;
+
     }
 
     private void OnSignalReceived(Entity<TestIterasmComponent> ent, ref SignalReceivedEvent args)
     {
-        if (ent.Comp.CurrentState == ExecutionState.Idle)
+        if (ent.Comp.CurrentState is ExecutionState.Busted or ExecutionState.Halted)
             return;
 
         var value = 0L;
@@ -106,19 +149,26 @@ public sealed class TestIterasmSystem : EntitySystem
     }
 }
 
-public sealed class TestIterasmState(TestIterasmComponent comp) : Iterasm.IterasmState
+public sealed class TestIterasmState(IGameTiming timing, IRobustRandom random, ISawmill log, TestIterasmComponent comp) : IterasmState, IIterasmLogging, IIterasmTiming, IIterasmRNG
 {
     private readonly TestIterasmComponent _comp = comp;
+    private readonly ISawmill _log = log;
 
-    public override Func<Iterasm.State, long, bool>? CustomOps(string op) => op switch
+    IGameTiming IIterasmTiming.Timing => timing;
+    IRobustRandom IIterasmRNG.Random => random;
+
+    public override Func<VmState, long, bool>? CustomOps(string op) => op switch
     {
         "emit" => Emit,
-        "receiveb" => TryReceive,
-        "receive" => Receive,
-        _ => base.CustomOps(op),
+        "receiveb" => Receive,
+        "receive" => TryReceive,
+        _ => ((IIterasmLogging) this).LoggingOps(op)
+            ?? ((IIterasmTiming) this).TimingOps(op)
+            ?? ((IIterasmRNG) this).RNGOps(op)
+            ?? base.CustomOps(op),
     };
 
-    private bool Emit(Iterasm.State state, long args)
+    private bool Emit(VmState state, long args)
     {
         var addrReg = (ushort) (args & 0xFFFF);
         var valueReg = (ushort) ((args >> 16) & 0xFFFF);
@@ -128,16 +178,15 @@ public sealed class TestIterasmState(TestIterasmComponent comp) : Iterasm.Iteras
         var addr = state.Get(addrReg);
         var len = state.Get((ushort) (addrReg + 1));
 
-        var portSlice = state.GetAddress((ulong) addr, (nuint) len);
+        var portSlice = state.ReadAddr((ulong) addr, (nuint) len);
         var port = Encoding.UTF8.GetString(portSlice.ReadOnlySpan);
 
         _comp.OutgoingQueue.Enqueue((port, value));
 
-        // return state.Increment();
         return true;
     }
 
-    private bool TryReceive(Iterasm.State state, long args)
+    private bool Receive(VmState state, long args)
     {
         var reg = (ushort) (args & 0xFFFF);
 
@@ -152,11 +201,10 @@ public sealed class TestIterasmState(TestIterasmComponent comp) : Iterasm.Iteras
             PutSignal(state, port, reg, value);
         }
 
-        // return state.Increment();
         return true;
     }
 
-    private bool Receive(Iterasm.State state, long args)
+    private bool TryReceive(VmState state, long args)
     {
         var reg = (ushort) (args & 0xFFFF);
 
@@ -171,20 +219,25 @@ public sealed class TestIterasmState(TestIterasmComponent comp) : Iterasm.Iteras
             PutSignal(state, port, reg, value);
         }
 
-
-        // return state.Increment();
         return true;
     }
 
-    public static void PutSignal(Iterasm.State state, string port, ushort reg, long value)
+    public static void PutSignal(VmState state, string port, ushort reg, long value)
     {
         var utf8Len = Encoding.UTF8.GetByteCount(port);
         var addr = state.Alloc((nuint) utf8Len);
-        var slice = state.GetAddress(addr, (nuint) utf8Len);
+        var slice = state.ReadAddr(addr, (nuint) utf8Len);
         System.Text.Unicode.Utf8.FromUtf16(port.AsSpan(), slice.Span, out var _, out var _);
 
         state.Set(reg, value);
         state.Set((ushort) (reg + 1), (long) addr);
         state.Set((ushort) (reg + 2), utf8Len);
+    }
+
+    bool IIterasmLogging.LogCallback(VmState state, string? msg)
+    {
+        //TODO: The non-i `log` op just doesn't work...
+        _log.Debug($"Iterasm log: {msg}");
+        return true;
     }
 }
