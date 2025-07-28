@@ -95,6 +95,7 @@ public readonly partial record struct VmState(IntPtr State)
     public ulong Alloc(ulong len) => Interop.IterasmState_alloc(State, len).AsOkOrElse(static r => throw r.AsErr().Exception);
     public void Dealloc(ulong addr) => Interop.IterasmState_dealloc(State, addr).AsOkOrElse(static r => throw r.AsErr().Exception);
     public SliceMutU8 ReadAddr(ulong addr, nuint len) => Interop.IterasmState_read(State, addr, len).AsOkOrElse(static r => throw r.AsErr().Exception);
+    public Chunk? GetAllocation(ulong index) => Interop.IterasmState_get_allocation(State, index).AsOkOrElse(static r => throw r.AsErr().Exception).AsSomeOrNull();
 
     public string? GetString(ushort reg) =>
         GetString((ulong) Get(reg), (nuint) Get((ushort) (reg + 1)));
