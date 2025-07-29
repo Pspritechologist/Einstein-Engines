@@ -26,3 +26,21 @@
       - AirDanger
   - type: SoundOnOverload
   - type: SpawnOnOverload
+
+- type: entity
+  parent: BaseItem
+  id: IterasmDbgCartridge
+  name: iterasm dbg cartridge
+  description: A program for keeping notes.
+  components:
+  - type: Sprite
+    sprite: Objects/Devices/cartridge.rsi
+    state: cart-nav
+  - type: UIFragment
+    ui: !type:IterasmDbgUi
+  - type: Cartridge
+    programName: Debugger
+    icon:
+      sprite:  Objects/Misc/books.rsi
+      state: book_icon
+  - type: IterasmDbgCartridge

@@ -1,0 +1,33 @@
+<cartridges:IterasmDbgUiFragment xmlns="https://spacestation14.io" Margin="1 0 2 0"
+                                 xmlns:code="clr-namespace:Content.Client._EE.UserInterface.Controls"
+                                 xmlns:cartridges="clr-namespace:Content.Client._EE.Iterasm"
+                                 xmlns:gfx="clr-namespace:Robust.Client.Graphics;assembly=Robust.Client">
+    <BoxContainer Orientation="Vertical" HorizontalExpand="True" VerticalExpand="True">
+        <PanelContainer HorizontalExpand="True">
+            <PanelContainer.PanelOverride> <gfx:StyleBoxFlat BackgroundColor="#1B1B1E"/> </PanelContainer.PanelOverride>
+            <BoxContainer Orientation="Horizontal" HorizontalExpand="True">
+                <Button Name="CompButton" Text="Compile" StyleClasses="OpenBoth"/>
+                <Button Name="RunButton" Text="Run" StyleClasses="OpenLeft"/>
+            </BoxContainer>
+        </PanelContainer>
+        <BoxContainer Orientation="Horizontal" HorizontalExpand="True" Align="Center">
+            <BoxContainer Orientation="Horizontal" Align="Begin" Margin="4 2 16 6">
+                <Label Name="Title" Text="Iterasm Debugger uwu"/>
+            </BoxContainer>
+            <PanelContainer HorizontalExpand="True">
+                <PanelContainer.PanelOverride> <gfx:StyleBoxFlat BackgroundColor="#1B1B1E"/> </PanelContainer.PanelOverride>
+            </PanelContainer>
+        </BoxContainer>
+        <ScrollContainer HorizontalExpand="True" VerticalExpand="True" HScrollEnabled="True">
+            <code:CodeEdit Name="SourceInput" HorizontalExpand="True" VerticalExpand="True" StyleClasses="monospace"/>
+        </ScrollContainer>
+        <PanelContainer>
+            <PanelContainer.PanelOverride> <gfx:StyleBoxFlat BackgroundColor="#1B1B1E"/> </PanelContainer.PanelOverride>
+            <BoxContainer Orientation="Horizontal" HorizontalExpand="True" Align="End" SeparationOverride="10" Margin="0 2">
+                <RichTextLabel Name="LineCol" Text="[font size=8]Ln 3, Col 4[/font]"/>
+                <RichTextLabel Name="MetaInfo" Text="[font size=8]NTF-12[/font]"/>
+                <RichTextLabel Name="Device" Text="[font size=8]Chemmaster on /dev/chemmaster.itint140219"/>
+            </BoxContainer>
+        </PanelContainer>
+    </BoxContainer>
+</cartridges:IterasmDbgUiFragment>
