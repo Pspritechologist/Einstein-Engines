@@ -1,5 +1,5 @@
 <cartridges:IterasmDbgUiFragment xmlns="https://spacestation14.io" Margin="1 0 2 0"
-                                 xmlns:code="clr-namespace:Content.Client._EE.UserInterface.Controls"
+                                 xmlns:code="clr-namespace:Content.Client._EE.UserInterface.Controls.CodeEdit"
                                  xmlns:cartridges="clr-namespace:Content.Client._EE.Iterasm"
                                  xmlns:gfx="clr-namespace:Robust.Client.Graphics;assembly=Robust.Client">
     <BoxContainer Orientation="Vertical" HorizontalExpand="True" VerticalExpand="True">
