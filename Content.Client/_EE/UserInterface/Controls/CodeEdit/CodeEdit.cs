@@ -62,10 +62,6 @@ public sealed partial class CodeEdit : Control
     private bool _mouseSelectingText;
     private Vector2 _lastMouseSelectPos;
 
-    // Debug overlay stuff.
-    internal bool DebugOverlay;
-    private Vector2? _lastDebugMousePos;
-
     public event Action<CodeEditEventArgs>? OnTextChanged;
 
     public CodeEdit()
@@ -1074,18 +1070,10 @@ public sealed partial class CodeEdit : Control
         return _lineBreaks[lineIndex - 1];
     }
 
-    protected override void MouseExited()
-    {
-        base.MouseExited();
-
-        _lastDebugMousePos = null;
-    }
-
     protected override void MouseMove(GUIMouseMoveEventArgs args)
     {
         base.MouseMove(args);
 
-        _lastDebugMousePos = args.RelativePosition;
         _lastMouseSelectPos = args.RelativePosition;
     }
 

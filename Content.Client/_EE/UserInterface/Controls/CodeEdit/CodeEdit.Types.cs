@@ -15,23 +15,6 @@ public sealed partial class CodeEdit
     /// </remarks>
     internal sealed class RenderBox : Control
     {
-        // Arrow shapes/data for the debug overlay.
-        private static readonly (Vector2, Vector2)[] ArrowUp =
-        {
-            (new(8, 14), new(8, 2)),
-            (new(4, 7), new(8, 2)),
-            (new(12, 7), new(8, 2)),
-        };
-
-        private static readonly (Vector2, Vector2)[] ArrowDown =
-        {
-            (new(8, 14), new(8, 2)),
-            (new(4, 9), new(8, 14)),
-            (new(12, 9), new(8, 14)),
-        };
-
-        private static readonly Vector2 ArrowSize = new(16, 16);
-
         private readonly CodeEdit _master;
 
         public RenderBox(CodeEdit master)
@@ -43,23 +26,9 @@ public sealed partial class CodeEdit
 
         protected override void Draw(DrawingHandleScreen handle)
         {
-            CursorPos? drawIndexDebug = null;
-            if (_master.DebugOverlay && _master._lastDebugMousePos is { } mouse)
-            {
-                drawIndexDebug = _master.GetIndexAtPos(mouse);
-            }
-
             var drawBox = PixelSizeBox;
             var font = _master.GetFont();
             var renderedTextColor = _master.GetFontColor();
-
-            if (_master.DebugOverlay && _master._horizontalCursorPos is { } hPos)
-            {
-                handle.DrawLine(
-                    new(hPos + drawBox.Left, drawBox.Top),
-                    new(hPos + drawBox.Left, drawBox.Bottom),
-                    Color.Purple);
-            }
 
             var scrollOffset = -_master._scrollBar.Value;
 
@@ -151,31 +120,9 @@ public sealed partial class CodeEdit
             CheckDrawCursors(LineBreakBias.Top);
             PostDrawLine();
 
-            // Draw cursor bias
-            if (_master.DebugOverlay)
-            {
-                var arrow = _master.CursorPosition.Bias == LineBreakBias.Bottom ? ArrowDown : ArrowUp;
-                foreach (var (to, from) in arrow)
-                {
-                    var offset = new Vector2(0, drawBox.Bottom - ArrowSize.Y);
-                    handle.DrawLine(to + offset, from + offset, Color.Green);
-                }
-            }
-
             void CheckDrawCursors(LineBreakBias bias)
             {
                 var pos = new CursorPos(count, bias);
-
-                if (drawIndexDebug == pos)
-                {
-                    handle.DrawRect(
-                        new UIBox2(
-                            baseLine.X,
-                            baseLine.Y - height + descent,
-                            baseLine.X + 1,
-                            baseLine.Y + descent),
-                        Color.Yellow);
-                }
 
                 if (_master.HasKeyboardFocus() && _master._cursorPosition == pos)
                 {
