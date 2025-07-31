@@ -82,7 +82,7 @@ public sealed partial class CodeEdit : Control
         AddChild(_renderBox = new RenderBox(this));
         AddChild(_scrollBar = new VScrollBar { HorizontalAlignment = HAlignment.Right });
 
-        OnTextChanged += _ => Formatter?.ClearCache();
+        OnTextChanged += _ => Formatter?.ResetCache();
 
         CanKeyboardFocus = true;
         KeyboardFocusOnClick = true;

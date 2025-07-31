@@ -103,7 +103,7 @@ public sealed partial class CodeEdit
         /// <summary>
         ///     Called any time the <see cref="CodeEdit"/>'s text is changed. Should be used to reset and clear any cached data.
         /// </summary>
-        void ClearCache();
+        void ResetCache();
     }
 
     /// <summary>
