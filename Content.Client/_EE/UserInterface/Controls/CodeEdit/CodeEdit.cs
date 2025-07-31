@@ -912,6 +912,9 @@ public sealed partial class CodeEdit : Control
     {
         EnsureLineBreaksUpdated();
 
+        // Position is relative to the whole control, but we only want to account for the text area.
+        position.X -= _renderBox.TextRenderBox.Position.X;
+
         var clickPos = position * UIScale;
         clickPos.Y += _scrollBar.Value;
 
