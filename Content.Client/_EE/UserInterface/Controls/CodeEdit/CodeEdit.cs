@@ -50,6 +50,8 @@ public sealed partial class CodeEdit : Control
 
     private bool _editable = true;
 
+    private readonly CodeEditFormatState _formatState = new();
+
     // Uncommitted IME positions are stored directly in the text rope.
     // This field tracks the start position thereof, and how long it is.
     // The intent is that the text is cut from the rope again if the composition gets cancelled or edited.
@@ -64,12 +66,23 @@ public sealed partial class CodeEdit : Control
 
     public event Action<CodeEditEventArgs>? OnTextChanged;
 
+    /// <summary>
+    ///     Set this to an instance of a Class that implements
+    ///     <see cref="ICodeEditFormatter"/> for your preferred syntax.
+    /// </summary>
+    /// <remarks>
+    ///     See the documentation of <see cref="ICodeEditFormatter"/> for more information on how to use this.
+    /// </remarks>
+    public ICodeEditFormatter? Formatter { get; set; }
+
     public CodeEdit()
     {
         IoCManager.InjectDependencies(this);
 
         AddChild(_renderBox = new RenderBox(this));
         AddChild(_scrollBar = new VScrollBar { HorizontalAlignment = HAlignment.Right });
+
+        OnTextChanged += _ => Formatter?.ClearCache();
 
         CanKeyboardFocus = true;
         KeyboardFocusOnClick = true;
@@ -758,11 +771,9 @@ public sealed partial class CodeEdit : Control
     {
         var size = base.ArrangeOverride(finalSize);
 
-        var renderBoxSize = _renderBox.Size;
+        _scrollBar.Page = _renderBox.TextRenderBox.PixelHeight;
 
-        _scrollBar.Page = renderBoxSize.Y * UIScale;
-
-        UpdateLineBreaks((int) (renderBoxSize.X * UIScale));
+        UpdateLineBreaks();
 
         return size;
     }
@@ -815,7 +826,7 @@ public sealed partial class CodeEdit : Control
     private void EnsureLineBreaksUpdated()
     {
         if (_lineUpdateQueued)
-            UpdateLineBreaks(PixelWidth);
+            UpdateLineBreaks();
     }
 
     public void InsertAtCursor(string text)
@@ -832,7 +843,7 @@ public sealed partial class CodeEdit : Control
         // _updatePseudoClass();
     }
 
-    private void UpdateLineBreaks(int pixelWidth)
+    private void UpdateLineBreaks()
     {
         _lineBreaks.Clear();
         InvalidateHorizontalCursorPos();
@@ -840,7 +851,9 @@ public sealed partial class CodeEdit : Control
         var font = GetFont();
         var scale = UIScale;
 
-        var wordWrap = new WordWrap(pixelWidth);
+        // Ensure we only get the valid text area, accounting for the scroll bar.
+        var textArea = _renderBox.TextRenderBox.PixelWidth - _scrollBar.PixelWidth;
+        var wordWrap = new WordWrap(textArea);
         int? breakLine;
 
         foreach (var rune in Rope.EnumerateRunes(GetDisplayRope()))

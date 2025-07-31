@@ -8,19 +8,62 @@ namespace Content.Client._EE.UserInterface.Controls.CodeEdit;
 public sealed partial class CodeEdit
 {
     /// <summary>
+    ///     Interface for syntax highlighting and formatting of the text in a <see cref="CodeEdit"/>.
+    /// </summary>
+    public interface ICodeEditFormatter
+    {
+        /// <summary>
+        ///     Called at the start of each draw frame to get the callback used throughout the draw.
+        /// </summary>
+        /// <param name="charIdx"> The first character that will be rendered during the draw. Will not always be the start of the text. </param>
+        /// <param name="state"> The state used throughout the draw. </param>
+        /// <returns>
+        ///     The callback used to format the <see cref="CodeEdit"/>'s text throughout the frame.
+        ///     <br/>
+        ///     See the documentation of <see cref="TextFormattingDelegate"/> for more information on how to use this.
+        /// </returns>
+        TextFormattingDelegate GetFormatCallback(int charIdx, CodeEditFormatState state);
+
+        /// <summary>
+        ///     Gets called once for each character drawn in the <see cref="CodeEdit"/>.
+        /// </summary>
+        /// <remarks>
+        ///     Note that characters not visible (i.e. outside of the active scroll area) are <i>not</i> drawn
+        ///     and therefore will not be provided as indexes. It is thus necessary to have the required information
+        ///     available ahead of time and not to rely on each character being passed to this method.
+        /// </remarks>
+        /// <param name="charIdx">
+        ///     The index of the current character within the Rope.
+        ///     <br/>
+        ///     The Rune itself can be accessed with
+        ///     <code>
+        ///         if (Rope.Index(codeEdit.TextRope, charIdx) == '\n')
+        ///             DoSomething();
+        ///     </code>
+        /// </param>
+        /// <param name="state"> The formatting state, how you instruct the CodeEdit. See docs on <see cref="CodeEditFormatState"/> for more information.</param>
+        delegate void TextFormattingDelegate(int charIdx, CodeEditFormatState fmtState);
+
+        /// <summary>
+        ///     Called any time the <see cref="CodeEdit"/>'s text is changed. Should be used to reset and clear any cached data.
+        /// </summary>
+        void ClearCache();
+    }
+
+    /// <summary>
     /// Sub-control responsible for doing the actual rendering work.
     /// </summary>
     /// <remarks>
     /// This is a sub-control to use <see cref="Control.RectClipContent"/>.
     /// </remarks>
-    internal sealed partial class RenderBox : BoxContainer
+    private sealed partial class RenderBox : BoxContainer
     {
         private readonly CodeEdit _master;
 
-        private readonly LineNumberColumn _lineNumberColumn;
-        private readonly TextBox _textBox;
+        public readonly LineNumberColumn LineNumberRenderColumn;
+        public readonly TextBox TextRenderBox;
 
-        public StyleBox? LineColumnPanel { set => _lineNumberColumn.PanelOverride = value; get => _lineNumberColumn.PanelOverride; }
+        public StyleBox? LineColumnPanel { set => LineNumberRenderColumn.PanelOverride = value; get => LineNumberRenderColumn.PanelOverride; }
 
         public RenderBox(CodeEdit master)
         {
@@ -28,8 +71,8 @@ public sealed partial class CodeEdit
 
             RectClipContent = true;
             Orientation = LayoutOrientation.Horizontal;
-            AddChild(_lineNumberColumn = new LineNumberColumn(this));
-            AddChild(_textBox = new TextBox(this));
+            AddChild(LineNumberRenderColumn = new LineNumberColumn(this));
+            AddChild(TextRenderBox = new TextBox(this));
         }
 
         internal sealed partial class TextBox : Control
@@ -61,6 +104,25 @@ public sealed partial class CodeEdit
     {
         public CodeEdit Control { get; } = control;
         public Rope.Node TextRope { get; } = textRope;
+    }
+
+    public sealed class CodeEditFormatState
+    {
+        public Font? OverrideFont { get; set; }
+        public Color? TextColor { get; set; }
+        public HighlightData? Highlight { get; set; }
+        public UnderlineData? Underline { get; set; }
+
+        public void Clear()
+        {
+            OverrideFont = null;
+            TextColor = null;
+            Highlight = null;
+            Underline = null;
+        }
+
+        public record struct UnderlineData(Color Color, int Thickness = 1);
+        public record struct HighlightData(Color Color, float HeightRatio = 1.0f);
     }
 
     /// <summary>

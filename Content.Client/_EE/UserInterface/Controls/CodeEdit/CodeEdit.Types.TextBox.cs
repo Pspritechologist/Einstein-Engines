@@ -7,22 +7,22 @@ namespace Content.Client._EE.UserInterface.Controls.CodeEdit;
 
 public sealed partial class CodeEdit
 {
-    internal sealed partial class RenderBox
+    private sealed partial class RenderBox
     {
         internal sealed partial class TextBox
         {
             protected override void Draw(DrawingHandleScreen handle)
             {
                 var drawBox = PixelSizeBox;
-                var font = _master.GetFont();
+                var defaultFont = _master.GetFont();
                 var renderedTextColor = _master.GetFontColor();
 
                 var scrollOffset = -_master._scrollBar.Value;
 
                 var scale = UIScale;
-                var baseLine = new Vector2(0, scrollOffset + font.GetAscent(scale));
-                var height = font.GetLineHeight(scale);
-                var descent = font.GetDescent(scale);
+                var baseLine = new Vector2(0, scrollOffset + defaultFont.GetAscent(scale));
+                var height = defaultFont.GetLineHeight(scale);
+                var descent = defaultFont.GetDescent(scale);
 
                 var viewT = -scrollOffset;
 
@@ -67,8 +67,32 @@ public sealed partial class CodeEdit
                     selectStartPos = 0;
                 }
 
+                var formatState = _master._formatState;
+                formatState.Clear();
+                var formatter = _master.Formatter?.GetFormatCallback(startIdx, formatState);
+
+                (float startPos, CodeEditFormatState.UnderlineData? data) currentUnderline = (drawBox.Left, null);
+                (float startPos, CodeEditFormatState.HighlightData? data) currentHighlight = (drawBox.Left, null);
+
                 foreach (var rune in Rope.EnumerateRunes(_master.GetDisplayRope(), startIdx))
                 {
+                    formatter?.Invoke(count, formatState);
+
+                    var font = formatState.OverrideFont ?? defaultFont;
+                    var color = formatState.TextColor ?? renderedTextColor;
+
+                    if (formatState.Underline != currentUnderline.data)
+                    {
+                        DrawUnderline();
+                        currentUnderline = (baseLine.X - (font.GetCharMetrics(rune, scale)?.BearingX ?? 0), formatState.Underline);
+                    }
+
+                    if (formatState.Highlight != currentHighlight.data)
+                    {
+                        DrawHighlight();
+                        currentHighlight = (baseLine.X - (font.GetCharMetrics(rune, scale)?.BearingX ?? 0), formatState.Highlight);
+                    }
+
                     CheckDrawCursors(LineBreakBias.Top);
 
                     if (lineBreakIndex < _master._lineBreaks.Count
@@ -97,7 +121,7 @@ public sealed partial class CodeEdit
 
                     CheckDrawCursors(LineBreakBias.Bottom);
 
-                    baseLine.X += font.DrawChar(handle, rune, baseLine, scale, renderedTextColor);
+                    baseLine.X += font.DrawChar(handle, rune, baseLine, scale, formatState.TextColor ?? color);
 
                     count += rune.Utf16SequenceLength;
                 }
@@ -165,8 +189,48 @@ public sealed partial class CodeEdit
                     }
                 }
 
+                void DrawUnderline()
+                {
+                    if (currentUnderline.data is { } underline)
+                    {
+                        var underlineColor = underline.Color;
+                        var thickness = underline.Thickness;
+
+                        handle.DrawRect(
+                            new UIBox2(
+                                currentUnderline.startPos,
+                                baseLine.Y + descent - thickness,
+                                baseLine.X,
+                                baseLine.Y + descent),
+                            underlineColor);
+
+                        currentUnderline.startPos = drawBox.Left;
+                    }
+                }
+
+                void DrawHighlight()
+                {
+                    if (currentHighlight.data is { } highlight)
+                    {
+                        var highlightColor = highlight.Color;
+
+                        handle.DrawRect(
+                            new UIBox2(
+                                currentHighlight.startPos,
+                                baseLine.Y - height + descent,
+                                baseLine.X,
+                                baseLine.Y + descent),
+                            highlightColor);
+
+                        currentHighlight.startPos = drawBox.Left;
+                    }
+                }
+
                 void PostDrawLine()
                 {
+                    DrawUnderline();
+                    DrawHighlight();
+
                     if (selectStartPos != null)
                     {
                         var rect = new UIBox2(
@@ -186,7 +250,7 @@ public sealed partial class CodeEdit
                     if (_master._imeData.HasValue && imeStartPos.HasValue)
                     {
                         // Draw IME underline.
-                        var y = baseLine.Y + font.GetDescent(scale);
+                        var y = baseLine.Y + defaultFont.GetDescent(scale);
                         var rect = new UIBox2(
                             imeStartPos.Value,
                             y - 1,

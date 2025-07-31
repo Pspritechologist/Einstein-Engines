@@ -8,7 +8,7 @@ namespace Content.Client._EE.UserInterface.Controls.CodeEdit;
 
 public sealed partial class CodeEdit
 {
-    internal sealed partial class RenderBox
+    private sealed partial class RenderBox
     {
         internal sealed partial class LineNumberColumn
         {

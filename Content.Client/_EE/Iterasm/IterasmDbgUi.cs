@@ -16,8 +16,6 @@ public sealed partial class IterasmDbgUi : UIFragment
     public override void Setup(BoundUserInterface userInterface, EntityUid? fragmentOwner)
     {
         _fragment = new IterasmDbgUiFragment();
-        _fragment.OnNoteRemoved += note => SendIterasmDbgMessage(IterasmDbgUiAction.Remove, note, userInterface);
-        _fragment.OnNoteAdded += note => SendIterasmDbgMessage(IterasmDbgUiAction.Add, note, userInterface);
     }
 
     public override void UpdateState(BoundUserInterfaceState state)
