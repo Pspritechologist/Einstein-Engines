@@ -8,49 +8,6 @@ namespace Content.Client._EE.UserInterface.Controls.CodeEdit;
 public sealed partial class CodeEdit
 {
     /// <summary>
-    ///     Interface for syntax highlighting and formatting of the text in a <see cref="CodeEdit"/>.
-    /// </summary>
-    public interface ICodeEditFormatter
-    {
-        /// <summary>
-        ///     Called at the start of each draw frame to get the callback used throughout the draw.
-        /// </summary>
-        /// <param name="charIdx"> The first character that will be rendered during the draw. Will not always be the start of the text. </param>
-        /// <param name="state"> The state used throughout the draw. </param>
-        /// <returns>
-        ///     The callback used to format the <see cref="CodeEdit"/>'s text throughout the frame.
-        ///     <br/>
-        ///     See the documentation of <see cref="TextFormattingDelegate"/> for more information on how to use this.
-        /// </returns>
-        TextFormattingDelegate GetFormatCallback(int charIdx, CodeEditFormatState state);
-
-        /// <summary>
-        ///     Gets called once for each character drawn in the <see cref="CodeEdit"/>.
-        /// </summary>
-        /// <remarks>
-        ///     Note that characters not visible (i.e. outside of the active scroll area) are <i>not</i> drawn
-        ///     and therefore will not be provided as indexes. It is thus necessary to have the required information
-        ///     available ahead of time and not to rely on each character being passed to this method.
-        /// </remarks>
-        /// <param name="charIdx">
-        ///     The index of the current character within the Rope.
-        ///     <br/>
-        ///     The Rune itself can be accessed with
-        ///     <code>
-        ///         if (Rope.Index(codeEdit.TextRope, charIdx) == '\n')
-        ///             DoSomething();
-        ///     </code>
-        /// </param>
-        /// <param name="state"> The formatting state, how you instruct the CodeEdit. See docs on <see cref="CodeEditFormatState"/> for more information.</param>
-        delegate void TextFormattingDelegate(int charIdx, CodeEditFormatState fmtState);
-
-        /// <summary>
-        ///     Called any time the <see cref="CodeEdit"/>'s text is changed. Should be used to reset and clear any cached data.
-        /// </summary>
-        void ClearCache();
-    }
-
-    /// <summary>
     /// Sub-control responsible for doing the actual rendering work.
     /// </summary>
     /// <remarks>
@@ -106,6 +63,58 @@ public sealed partial class CodeEdit
         public Rope.Node TextRope { get; } = textRope;
     }
 
+    /// <summary>
+    ///     Interface for syntax highlighting and formatting of the text in a <see cref="CodeEdit"/>.
+    /// </summary>
+    public interface ICodeEditFormatter
+    {
+        /// <summary>
+        ///     Called at the start of each draw frame to get the callback used throughout the draw.
+        /// </summary>
+        /// <param name="charIdx"> The first character that will be rendered during the draw. Will not always be the start of the text. </param>
+        /// <param name="state"> The state used throughout the draw. </param>
+        /// <returns>
+        ///     The callback used to format the <c><see cref="CodeEdit"/></c>'s text throughout the frame.
+        ///     <br/>
+        ///     See the documentation of <c><see cref="TextFormattingDelegate"/></c> for more information on how to use this.
+        /// </returns>
+        TextFormattingDelegate GetFormatCallback(int charIdx, CodeEditFormatState state);
+
+        /// <summary>
+        ///     Gets called once for each character drawn in the <see cref="CodeEdit"/>.
+        /// </summary>
+        /// <remarks>
+        ///     Note that characters not visible (i.e. outside of the active scroll area) are <i>not</i> drawn
+        ///     and therefore will not be provided as indexes. It is thus necessary to have the required information
+        ///     available ahead of time and not to rely on each character being passed to this method.
+        /// </remarks>
+        /// <param name="charIdx">
+        ///     The index of the current character within the Rope.
+        ///     <br/>
+        ///     The Rune itself can be accessed with
+        ///     <code>
+        ///         if (Rope.Index(codeEdit.TextRope, charIdx) == '\n')
+        ///             DoSomething();
+        ///     </code>
+        /// </param>
+        /// <param name="state"> The formatting state, how you instruct the CodeEdit. See docs on <c><see cref="CodeEditFormatState"/></c> for more information.</param>
+        delegate void TextFormattingDelegate(int charIdx, CodeEditFormatState fmtState);
+
+        /// <summary>
+        ///     Called any time the <see cref="CodeEdit"/>'s text is changed. Should be used to reset and clear any cached data.
+        /// </summary>
+        void ClearCache();
+    }
+
+    /// <summary>
+    ///     The type passed to <c><see cref="ICodeEditFormatter.TextFormattingDelegate"/></c>.
+    ///     <br/>
+    ///     The values contained will be used to style the character currently being drawn.
+    /// </summary>
+    /// <remarks>
+    ///     Note that it is <i>not</i> reset between characters. Setting the colour and nor ressetting it next char will result
+    ///     in every character following it being drawn with the same colour.
+    /// </remarks>
     public sealed class CodeEditFormatState
     {
         public Font? OverrideFont { get; set; }
