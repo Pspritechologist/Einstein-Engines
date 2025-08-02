@@ -16,6 +16,8 @@ public sealed partial class IterasmDbgUi : UIFragment
     public override void Setup(BoundUserInterface userInterface, EntityUid? fragmentOwner)
     {
         _fragment = new IterasmDbgUiFragment();
+        _fragment.OnCompilePressed += program
+            => userInterface.SendMessage(new CartridgeUiMessage(new IterasmDbgUiMessageEvent(program)));
     }
 
     public override void UpdateState(BoundUserInterfaceState state)
@@ -24,12 +26,5 @@ public sealed partial class IterasmDbgUi : UIFragment
             return;
 
         _fragment?.UpdateState(iterasmState);
-    }
-
-    private void SendIterasmDbgMessage(IterasmDbgUiAction action, string note, BoundUserInterface userInterface)
-    {
-        var iterasmMsg = new IterasmDbgUiMessageEvent(action, note);
-        var uiMsg = new CartridgeUiMessage(iterasmMsg);
-        userInterface.SendMessage(uiMsg);
     }
 }

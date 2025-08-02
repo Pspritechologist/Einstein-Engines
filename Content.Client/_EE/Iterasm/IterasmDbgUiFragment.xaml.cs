@@ -15,6 +15,10 @@ namespace Content.Client._EE.Iterasm;
 [GenerateTypedNameReferences]
 public sealed partial class IterasmDbgUiFragment : BoxContainer
 {
+    public event Action<string>? OnCompilePressed;
+
+    private readonly Formatter _formatter;
+
     public IterasmDbgUiFragment()
     {
         RobustXamlLoader.Load(this);
@@ -22,12 +26,17 @@ public sealed partial class IterasmDbgUiFragment : BoxContainer
         HorizontalExpand = true;
         VerticalExpand = true;
 
-        SourceInput.Formatter = new Formatter(SourceInput);
+        CompButton.OnPressed += _ => OnCompilePressed?.Invoke(Rope.Collapse(SourceInput.TextRope));
+
+        SourceInput.Formatter = _formatter = new Formatter(SourceInput);
     }
 
     private sealed class Formatter(CodeEdit codeEdit) : CodeEdit.ICodeEditFormatter
     {
+        public uint? ErrorLine = null;
+
         private readonly List<Span> _comments = new();
+        private Span? _errorSpan = null;
 
         private static Robust.Client.ResourceManagement.IResourceCache Cache => IoCManager.Resolve<Robust.Client.ResourceManagement.IResourceCache>();
         private static readonly Robust.Client.Graphics.VectorFont ItalicFont
@@ -38,19 +47,32 @@ public sealed partial class IterasmDbgUiFragment : BoxContainer
             _comments.Clear();
 
             int? commentStart = null;
+            int? errorStart = null;
 
             var i = 0;
+            var line = 0;
             foreach (var leaf in Rope.CollectLeaves(codeEdit.TextRope))
             {
                 foreach (var c in leaf.Text)
                 {
                     if (c == ';' && commentStart is not null)
                         commentStart = i;
-                    else if (c == '\n' && commentStart is { } start)
+                    if (c == '\n')
                     {
-                        _comments.Add(new Span(start, i - start));
-                        commentStart = null;
+                        line++;
+
+                        if (commentStart is not null)
+                        {
+                            _comments.Add(new Span(commentStart.Value, i - commentStart.Value));
+                            commentStart = null;
+                        }
+
+                        if (errorStart is not null)
+                            _errorSpan = new Span(errorStart.Value, i - errorStart.Value);
                     }
+
+                    if (line == ErrorLine)
+                        errorStart ??= i;
 
                     i++;
                 }
@@ -64,21 +86,29 @@ public sealed partial class IterasmDbgUiFragment : BoxContainer
                 state.TextColor = Color.Green;
                 state.OverrideFont = ItalicFont;
             }
+            // Either comment *or* error. We don't underline the comment portion of an error.
+            else if (_errorSpan?.Start.Value <= charIdx && _errorSpan?.End.Value > charIdx)
+                state.Underline = Color.Red;
 
             return Callback;
         }
 
         private void Callback(int charIdx, CodeEdit.CodeEditFormatState state)
         {
+            if (charIdx == _errorSpan?.Start.Value)
+                state.Underline = Color.Red;
+
             switch (Rope.Index(codeEdit.TextRope, charIdx))
             {
                 case ';':
                     state.TextColor = Color.Green;
                     state.OverrideFont = ItalicFont;
+                    state.Underline = null;
                     break;
                 case '\n':
                     state.TextColor = null;
                     state.OverrideFont = null;
+                    state.Underline = null;
                     break;
                 default:
                     break;
@@ -88,17 +118,21 @@ public sealed partial class IterasmDbgUiFragment : BoxContainer
 
     public void UpdateState(IterasmDbgUiState state)
     {
-        // Check if state is IterasmDbgUiCompErrorState or IterasmDbgUiOkState
         switch (state)
         {
             case IterasmDbgUiCompErrorState compErrState:
-                MetaInfo.Text = $"[font size=8]{compErrState.ErrorMessage}[/font]";
-                LineCol.Text = $"[font size=8]Ln {compErrState.Line + 1}[/font]";
+                _formatter.ErrorLine = compErrState.Line;
+                break;
+
+            case IterasmDbgUiOkState _:
+                _formatter.ErrorLine = null;
                 break;
 
             default:
                 break;
         }
+
+        _formatter.ResetCache();
     }
 
     protected override void FrameUpdate(FrameEventArgs args)

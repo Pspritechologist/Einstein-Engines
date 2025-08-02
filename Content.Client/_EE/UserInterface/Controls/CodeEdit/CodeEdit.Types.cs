@@ -130,8 +130,16 @@ public sealed partial class CodeEdit
             Underline = null;
         }
 
-        public record struct UnderlineData(Color Color, int Thickness = 1);
-        public record struct HighlightData(Color Color, float HeightRatio = 1.0f);
+        public record struct UnderlineData(Color Color, int Thickness = 1)
+        {
+            public static implicit operator UnderlineData((Color Color, int Thickness) tuple) => new(tuple.Color, tuple.Thickness);
+            public static implicit operator UnderlineData(Color color) => new(color);
+        }
+        public record struct HighlightData(Color Color, float HeightRatio = 1.0f)
+        {
+            public static implicit operator HighlightData((Color Color, float HeightRatio) tuple) => new(tuple.Color, tuple.HeightRatio);
+            public static implicit operator HighlightData(Color color) => new(color);
+        }
     }
 
     /// <summary>
