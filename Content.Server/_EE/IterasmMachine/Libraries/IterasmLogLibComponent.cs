@@ -37,11 +37,6 @@ public sealed partial class IterasmLogLibComponent : Component
     /// </summary>
     [DataField]
     public string? FormatInsert = null;
-
-    /// <summary>
-    ///     Messages are stored here before being logged on the next tick.
-    /// </summary>
-    public List<string> LogQueue = new();
 }
 
 public readonly record struct IterasmMachineLogEvent(string Message);

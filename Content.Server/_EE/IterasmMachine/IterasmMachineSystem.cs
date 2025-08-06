@@ -15,15 +15,21 @@ public sealed partial class IterasmMachineSystem : EntitySystem
     [Dependency] private readonly SharedAudioSystem _audio = default!;
     [Dependency] private readonly PopupSystem _popupSystem = default!;
 
+    private static readonly TimeSpan MinTimePerTickSound = TimeSpan.FromMilliseconds(10);
+
     public override void Initialize()
     {
         base.Initialize();
 
+        // Without this Components would be left in an invalid state, since the initial value is `default!`.
         SubscribeLocalEvent<IterasmMachineComponent, ComponentInit>((ent, comp, ev) => comp.State = new IterasmMachineState((ent, comp)));
-        SubscribeLocalEvent<IterasmMachineComponent, ComponentStartup>((ent, comp, ev) => RefreshOperations((ent, comp)));
+
+        // This is necessary to dispose of the used native resources in the Iterasm state.
         SubscribeLocalEvent<IterasmMachineComponent, ComponentRemove>((ent, comp, ev) => comp.Dispose());
 
-        SubscribeLocalEvent<IterasmMachineDefaultProgrammedComponent, ComponentStartup>(OnDefaultProgrammedStartup);
+        SubscribeLocalEvent<IterasmMachineComponent, ComponentStartup>((ent, comp, ev) => RefreshOperations((ent, comp)));
+
+        SubscribeLocalEvent<IterasmMachineDefaultProgrammedComponent, MapInitEvent>(OnDefaultProgrammedStartup);
 
         InitializeLibraries();
     }
@@ -50,16 +56,30 @@ public sealed partial class IterasmMachineSystem : EntitySystem
 
             try
             {
-                iterasm.State.Vm.RunSteps(stepsToRun);
+                var lastTickSoundInterval = TimeSpan.Zero;
+
                 for (var i = 0u; i < stepsToRun; i++)
-                    _audio.PlayPvs(new SoundPathSpecifier("/Audio/Weapons/Guns/Empty/empty.ogg"), ent);
+                {
+                    if (iterasm.TickSound is not null && _timing.CurTime - lastTickSoundInterval >= MinTimePerTickSound)
+                    {
+                        _audio.PlayPvs(iterasm.TickSound, ent);
+                        lastTickSoundInterval = _timing.CurTime;
+                    }
+
+                    iterasm.State.Vm.RunStep();
+                    var ev = new IterasmMachineAfterTickEvent((ent, iterasm));
+                    RaiseLocalEvent(ent, ref ev);
+                    if (ev.StopExecution) break;
+                }
             }
             catch (Iterasm.Binds.IterasmRuntimeErrorException e)
             {
                 _popupSystem.PopupEntity($"Runtime error: {e.Message}", ent, Shared.Popups.PopupType.MediumCaution);
-                _audio.PlayPvs(new SoundPathSpecifier("/Audio/Items/Defib/defib_failed.ogg"), ent);
+                _audio.PlayPvs(iterasm.ErrorSound, ent);
 
                 StopExecution((ent, active));
+
+                RaiseLocalEvent(ent, new IterasmMachineRuntimeErrorEvent((ent, iterasm), e.Message));
             }
 
             active.Pc = iterasm.State.State?.Pc ?? 0;
@@ -72,6 +92,11 @@ public sealed partial class IterasmMachineSystem : EntitySystem
         if (!Resolve(ent.Owner, ref ent.Comp))
             return;
 
+        var ev = new IterasmMachineTryStartExecutionEvent(ent!);
+        RaiseLocalEvent(ent, ref ev);
+        if (ev.Cancelled)
+            return;
+
         if (EnsureComp(ent.Owner, out IterasmMachineActiveComponent active))
             return; // Machine was already active.
 
@@ -80,10 +105,10 @@ public sealed partial class IterasmMachineSystem : EntitySystem
 
     public void StopExecution(Entity<IterasmMachineActiveComponent?> ent)
     {
-        if (!Resolve(ent.Owner, ref ent.Comp, false))
+        if (!Resolve(ent, ref ent.Comp, false))
             return;
 
-        RemCompDeferred<IterasmMachineActiveComponent>(ent.Owner);
+        RemCompDeferred(ent, ent.Comp);
     }
 
     public void RefreshOperations(Entity<IterasmMachineComponent?> ent)
@@ -95,7 +120,7 @@ public sealed partial class IterasmMachineSystem : EntitySystem
         RaiseLocalEvent(ent.Owner, new IterasmMachineGetOpsEvent(Log, ent.Comp.Ops));
     }
 
-    private void OnDefaultProgrammedStartup(Entity<IterasmMachineDefaultProgrammedComponent> ent, ref ComponentStartup args)
+    private void OnDefaultProgrammedStartup(Entity<IterasmMachineDefaultProgrammedComponent> ent, ref MapInitEvent args)
     {
         if (ent.Comp.Spent) return;
         if (!TryComp(ent.Owner, out IterasmMachineComponent? iterasm))
@@ -104,13 +129,14 @@ public sealed partial class IterasmMachineSystem : EntitySystem
             return;
         }
 
-        RefreshOperations((ent, iterasm));
-
         try { iterasm.State.Compile(ent.Comp.Program); }
         catch (Iterasm.Binds.CompilationException e)
         {
             Log.Error($"Error while compiling source code from {nameof(IterasmMachineDefaultProgrammedComponent)} on Entity {ent.Owner} ({MetaData(ent.Owner).EntityPrototype}): {e.Message}");
+            return;
         }
+
+        StartExecution((ent.Owner, iterasm));
     }
 }
 

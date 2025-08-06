@@ -22,7 +22,6 @@ public sealed partial class IterasmMachineSystem : EntitySystem
         SubscribeLocalEvent<IterasmLogLibComponent, ComponentStartup>((uid, comp, ev) => RefreshOperations(uid));
         SubscribeLocalEvent<IterasmLogLibComponent, ComponentShutdown>((uid, comp, ev) => RefreshOperations(uid));
         SubscribeLocalEvent<IterasmLogLibComponent, IterasmMachineGetOpsEvent>((uid, comp, ev) => ev.RegisterOps(LoggingOps((uid, comp))));
-        SubscribeLocalEvent<IterasmLogLibComponent, IterasmMachineAfterTickEvent>(LogAfterTick);
 
         SubscribeLocalEvent<IterasmRngLibComponent, ComponentStartup>((uid, comp, ev) => RefreshOperations(uid));
         SubscribeLocalEvent<IterasmRngLibComponent, ComponentShutdown>((uid, comp, ev) => RefreshOperations(uid));
@@ -48,12 +47,12 @@ public sealed partial class IterasmMachineSystem : EntitySystem
         }),
     ];
 
-    private static (string name, string docs, Func<Iterasm.VmState, long, bool> op)[] LoggingOps(Entity<IterasmLogLibComponent> machine) => [
+    private (string name, string docs, Func<Iterasm.VmState, long, bool> op)[] LoggingOps(Entity<IterasmLogLibComponent> machine) => [
         ("log", "Attempts to print the string at Reg(1) with a len of Reg(1 + 1r). Null strings are ignored.\nThe exact effects of this are vendor specific.", (state, args) =>
         {
             var reg = (ushort) (args & 0xFFFF);
             if (state.GetString(reg) is { } msg)
-                machine.Comp.LogQueue.Add(msg);
+                RaiseLocalEvent(machine, new IterasmMachineLogEvent(msg));
             return true;
         }),
         ("logi", "Attempts to print the string at address Tim(1) with a len of Rim(2). Null strings are ignored.\nThe exact effects of this are vendor specific.", (state, args) =>
@@ -61,18 +60,10 @@ public sealed partial class IterasmMachineSystem : EntitySystem
             var addr = (ulong) (args & 0xFFFFFFFF);
             var len = (nuint) ((args >> 32) & 0xFFFF);
             if (state.GetString(addr, len) is { } msg)
-                machine.Comp.LogQueue.Add(msg);
+                RaiseLocalEvent(machine, new IterasmMachineLogEvent(msg));
             return true;
         }),
     ];
-
-    private void LogAfterTick(Entity<IterasmLogLibComponent> ent, ref IterasmMachineAfterTickEvent args)
-    {
-        foreach (var msg in ent.Comp.LogQueue)
-            RaiseLocalEvent(ent, new IterasmMachineLogEvent(msg));
-
-        ent.Comp.LogQueue.Clear();
-    }
 
     private (string name, string docs, Func<Iterasm.VmState, long, bool> op)[] RngOps() => [
         ("rng", "Sets Reg(1) a pseudo random value in a vendor specific range.", (state, args) =>

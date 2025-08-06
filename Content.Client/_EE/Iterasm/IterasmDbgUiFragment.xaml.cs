@@ -86,8 +86,8 @@ public sealed partial class IterasmDbgUiFragment : BoxContainer
                 state.TextColor = Color.Green;
                 state.OverrideFont = ItalicFont;
             }
-            // Either comment *or* error. We don't underline the comment portion of an error.
-            else if (_errorSpan?.Start.Value <= charIdx && _errorSpan?.End.Value > charIdx)
+
+            if (_errorSpan?.Start.Value <= charIdx && _errorSpan?.End.Value > charIdx)
                 state.Underline = Color.Red;
 
             return Callback;
@@ -122,6 +122,11 @@ public sealed partial class IterasmDbgUiFragment : BoxContainer
         {
             case IterasmDbgUiCompErrorState compErrState:
                 _formatter.ErrorLine = compErrState.Line;
+                break;
+
+            case IterasmDbgUiRuntimeErrorState runtimeErrState:
+                _formatter.ErrorLine = null;
+                //TODO Iterasm: Something here :)
                 break;
 
             case IterasmDbgUiOkState _:

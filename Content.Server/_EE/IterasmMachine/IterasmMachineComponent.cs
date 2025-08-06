@@ -1,4 +1,5 @@
 using Content.Server._EE.Iterasm;
+using Robust.Shared.Audio;
 
 namespace Content.Server._EE.IterasmMachine;
 
@@ -14,6 +15,12 @@ public sealed partial class IterasmMachineComponent : Component, IDisposable
     /// </summary>
     [DataField]
     public bool CatchupOps = true;
+
+    [DataField]
+    public SoundPathSpecifier? TickSound;
+
+    [DataField]
+    public SoundPathSpecifier? ErrorSound;
 
     public Dictionary<string, (string docs, Func<VmState, long, bool> op)> Ops = new();
 

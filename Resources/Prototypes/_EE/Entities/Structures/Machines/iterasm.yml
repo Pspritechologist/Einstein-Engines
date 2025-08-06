@@ -3,7 +3,37 @@
   parent: BaseComputer
   id: TestIterasmMachine
   components:
-  - type: TestIterasm
+  # - type: TestIterasm
+  - type: IterasmMachine
+    tickSound:
+      path: /Audio/Weapons/Guns/Empty/empty.ogg
+      params:
+        volume: 0.5
+    errorSound:
+      path: /Audio/Items/Defib/defib_failed.ogg
+  - type: IterasmLogLib
+  - type: IterasmMachineDefaultProgrammed
+    program: |
+      ent 5
+      setstr 1 'Hello, World!'
+
+      # loop
+
+      log 1
+
+      addi 0 0 25t
+      # timer1
+      subi 0 0 1t
+      jmpif timer1 0
+
+      logi 'Goodbye, World!'
+
+      addi 0 0 25t
+      # timer2
+      subi 0 0 1t
+      jmpif timer2 0
+
+      jmp loop
 
   - type: Paper
   - type: ActivatableUI

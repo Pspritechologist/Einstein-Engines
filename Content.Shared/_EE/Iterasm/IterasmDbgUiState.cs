@@ -16,3 +16,9 @@ public sealed class IterasmDbgUiCompErrorState(string errMsg, uint line) : Itera
     public string ErrorMessage = errMsg;
     public uint Line = line;
 }
+
+[Serializable, NetSerializable]
+public sealed class IterasmDbgUiRuntimeErrorState(string errMsg) : IterasmDbgUiState()
+{
+    public string ErrorMessage = errMsg;
+}

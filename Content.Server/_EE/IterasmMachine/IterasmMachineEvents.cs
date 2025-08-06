@@ -27,6 +27,9 @@ public readonly record struct IterasmMachineGetOpsEvent
 }
 
 [ByRefEvent]
-public record struct IterasmMachineAfterTickEvent(Entity<IterasmMachineComponent> Machine, bool StopExecution);
+public record struct IterasmMachineAfterTickEvent(Entity<IterasmMachineComponent> Machine, bool StopExecution = false);
 
-public readonly record struct IterasmMachineRuntimeErrorEvent(string Message);
+[ByRefEvent]
+public record struct IterasmMachineTryStartExecutionEvent(Entity<IterasmMachineComponent> Machine, bool Cancelled = false);
+
+public readonly record struct IterasmMachineRuntimeErrorEvent(Entity<IterasmMachineComponent> Machine, string Message);

@@ -23,8 +23,9 @@ public sealed class IterasmDbgCartridgeSystem : EntitySystem
 
         SubscribeLocalEvent<IterasmDbgCartridgeComponent, CartridgeAfterInteractEvent>(OnDebuggerInteract);
 
-        //TODO Iteasm: This should probably have its own Component.
-        SubscribeLocalEvent<IterasmMachineComponent, IterasmMachineLogEvent>(OnIterasmLogEvent);
+        //TODO Iterasm: These should have their own Component, a 'DbgTarget' Component or somethin.
+        SubscribeLocalEvent<IterasmMachineComponent, IterasmMachineLogEvent>(OnIterasmLog);
+        SubscribeLocalEvent<IterasmMachineComponent, IterasmMachineRuntimeErrorEvent>(OnIterasmRuntimeErrorEvent);
     }
 
     /// <summary>
@@ -88,9 +89,9 @@ public sealed class IterasmDbgCartridgeSystem : EntitySystem
         ent.Comp.ProgramTarget = machine!;
     }
 
-    private void OnIterasmLogEvent(Entity<IterasmMachineComponent> ent, ref IterasmMachineLogEvent args)
+    private void OnIterasmLog(Entity<IterasmMachineComponent> ent, ref IterasmMachineLogEvent args)
     {
-        var query = new EntityQueryEnumerator<IterasmDbgCartridgeComponent>();
+        var query = EntityQueryEnumerator<IterasmDbgCartridgeComponent>();
 
         while (query.MoveNext(out var dbgUid, out var dbgComp))
         {
@@ -99,6 +100,25 @@ public sealed class IterasmDbgCartridgeSystem : EntitySystem
                 if (Comp<CartridgeComponent>(dbgUid).LoaderUid is not { } loaderUid)
                     break;
 
+                _loader.SendNotification(loaderUid, $"/dev/{ent.Owner}", args.Message);
+
+                break;
+            }
+        }
+    }
+
+    private void OnIterasmRuntimeErrorEvent(Entity<IterasmMachineComponent> ent, ref IterasmMachineRuntimeErrorEvent args)
+    {
+        var query = EntityQueryEnumerator<IterasmDbgCartridgeComponent>();
+
+        while (query.MoveNext(out var dbgUid, out var dbgComp))
+        {
+            if (dbgComp.ProgramTarget?.Owner == ent.Owner)
+            {
+                if (Comp<CartridgeComponent>(dbgUid).LoaderUid is not { } loaderUid)
+                    break;
+
+                SetUiStateError(loaderUid, args.Message, 0);
                 _loader.SendNotification(loaderUid, $"/dev/{ent.Owner}", args.Message);
 
                 break;
