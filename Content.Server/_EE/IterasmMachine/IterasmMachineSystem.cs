@@ -82,7 +82,7 @@ public sealed partial class IterasmMachineSystem : EntitySystem
                 RaiseLocalEvent(ent, new IterasmMachineRuntimeErrorEvent((ent, iterasm), e.Message));
             }
 
-            active.Pc = iterasm.State.State?.Pc ?? 0;
+            active.Pc = iterasm.State.Vm.IsInit ? iterasm.State.State.Pc : 0;
             active.NextExecution = _timing.CurTime + iterasm.ExecutionInterval;
         }
     }
@@ -144,5 +144,5 @@ public sealed class IterasmMachineState(Entity<IterasmMachineComponent> ent) : I
 {
     //TODO Iterasm: This should be handled slightly lower level.
     // I probably want to hold the final callback items in this dict, not the C# Funcs.
-    public override Func<VmState, long, bool>? CustomOps(string op) => ent.Comp.Ops.TryGetValue(op, out var inst) ? inst.op : null;
+    public override IterasmOp? CustomOps(string op) => ent.Comp.Ops.TryGetValue(op, out var inst) ? inst.op : null;
 }

@@ -22,7 +22,7 @@ public sealed partial class IterasmMachineComponent : Component, IDisposable
     [DataField]
     public SoundPathSpecifier? ErrorSound;
 
-    public Dictionary<string, (string docs, Func<VmState, long, bool> op)> Ops = new();
+    public Dictionary<string, (string docs, IterasmOp op)> Ops = new();
 
     public IterasmMachineState State = default!;
 

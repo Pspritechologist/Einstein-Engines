@@ -1,5 +1,6 @@
 
 using System.Linq;
+using Content.Server._EE.Iterasm;
 using Content.Server._EE.IterasmMachine.Libraries;
 using Content.Shared.Clock;
 using Content.Shared.GameTicking;
@@ -28,7 +29,7 @@ public sealed partial class IterasmMachineSystem : EntitySystem
         SubscribeLocalEvent<IterasmRngLibComponent, IterasmMachineGetOpsEvent>((uid, comp, ev) => ev.RegisterOps(RngOps()));
     }
 
-    private (string name, string docs, Func<Iterasm.VmState, long, bool> op)[] TimingOps() => [
+    private (string name, string docs, IterasmOp op)[] TimingOps() => [
         ("time", "Sets Reg(1) to the current time in milliseconds.", (state, args) =>
         {
             var reg = (ushort) (args & 0xFFFF);
@@ -36,24 +37,24 @@ public sealed partial class IterasmMachineSystem : EntitySystem
             // This should 'wrap around' in the unlikely event we have too many milliseconds...
             // (Which would happen after over half a billion years... Not even Frontier is hitting that).
             state.Set(reg, long.CreateTruncating(time));
-            return true;
+            return false;
         }),
         ("ftime", "Sets Reg(1) to the current time in fractional milliseconds.", (state, args) =>
         {
             var reg = (ushort) (args & 0xFFFF);
             var time = GetGlobalTime().TotalMilliseconds;
             state.Set(reg, BitConverter.DoubleToInt64Bits(time));
-            return true;
+            return false;
         }),
     ];
 
-    private (string name, string docs, Func<Iterasm.VmState, long, bool> op)[] LoggingOps(Entity<IterasmLogLibComponent> machine) => [
+    private (string name, string docs, IterasmOp op)[] LoggingOps(Entity<IterasmLogLibComponent> machine) => [
         ("log", "Attempts to print the string at Reg(1) with a len of Reg(1 + 1r). Null strings are ignored.\nThe exact effects of this are vendor specific.", (state, args) =>
         {
             var reg = (ushort) (args & 0xFFFF);
             if (state.GetString(reg) is { } msg)
                 RaiseLocalEvent(machine, new IterasmMachineLogEvent(msg));
-            return true;
+            return false;
         }),
         ("logi", "Attempts to print the string at address Tim(1) with a len of Rim(2). Null strings are ignored.\nThe exact effects of this are vendor specific.", (state, args) =>
         {
@@ -61,24 +62,24 @@ public sealed partial class IterasmMachineSystem : EntitySystem
             var len = (nuint) ((args >> 32) & 0xFFFF);
             if (state.GetString(addr, len) is { } msg)
                 RaiseLocalEvent(machine, new IterasmMachineLogEvent(msg));
-            return true;
+            return false;
         }),
     ];
 
-    private (string name, string docs, Func<Iterasm.VmState, long, bool> op)[] RngOps() => [
+    private (string name, string docs, IterasmOp op)[] RngOps() => [
         ("rng", "Sets Reg(1) a pseudo random value in a vendor specific range.", (state, args) =>
         {
             var reg = (ushort) (args & 0xFFFF);
             var value = _random.GetRandom().NextFullRangeInt64();
             state.Set(reg, value);
-            return true;
+            return false;
         }),
         ("frng", "Sets Reg(1) a pseudo random floating point value in a vendor specific range.", (state, args) =>
         {
             var reg = (ushort) (args & 0xFFFF);
             var value = _random.NextDouble();
             state.Set(reg, BitConverter.DoubleToInt64Bits(value));
-            return true;
+            return false;
         }),
     ];
 

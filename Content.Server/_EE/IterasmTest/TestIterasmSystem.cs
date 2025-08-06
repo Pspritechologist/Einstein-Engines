@@ -18,13 +18,12 @@ public sealed class TestIterasmSystem : EntitySystem
 
     [Dependency] private readonly PopupSystem _popupSystem = default!;
     [Dependency] private readonly IGameTiming _timing = default!;
-    [Dependency] private readonly IRobustRandom _random = default!;
     [Dependency] private readonly SharedDeviceLinkSystem _signal = default!;
     [Dependency] private readonly SharedAudioSystem _audio = default!;
 
     public override void Initialize()
     {
-        SubscribeLocalEvent<TestIterasmComponent, ComponentInit>((ent, comp, ev) => comp.IterasmState = new(_timing, _random, Log, comp));
+        SubscribeLocalEvent<TestIterasmComponent, ComponentInit>((ent, comp, ev) => comp.IterasmState = new(comp));
         SubscribeLocalEvent<TestIterasmComponent, ComponentRemove>((ent, comp, ev) => comp.IterasmState?.Dispose());
         SubscribeLocalEvent<TestIterasmComponent, SignalReceivedEvent>(OnSignalReceived);
 
@@ -106,7 +105,7 @@ public sealed class TestIterasmSystem : EntitySystem
         {
             var (port, value) = iterasm.IncomingQueue.Dequeue();
 
-            TestIterasmState.PutSignal((VmState) iterasm.IterasmState.State!, port, iterasm.RequestedRegister, value);
+            TestIterasmState.PutSignal((VmState) iterasm.IterasmState.State, port, iterasm.RequestedRegister, value);
             iterasm.CurrentState = ExecutionState.Running;
         }
 
@@ -131,7 +130,7 @@ public sealed class TestIterasmSystem : EntitySystem
                 return;
             }
 
-            iterasm.Pc = iterasm.IterasmState.State?.Pc ?? 0;
+            iterasm.Pc = iterasm.IterasmState.Vm.IsInit ? iterasm.IterasmState.State.Pc : 0;
         }
         else
             iterasm.Pc = 0;
@@ -149,23 +148,16 @@ public sealed class TestIterasmSystem : EntitySystem
     }
 }
 
-public sealed class TestIterasmState(IGameTiming timing, IRobustRandom random, ISawmill log, TestIterasmComponent comp) : IterasmState, IIterasmLogging, IIterasmTiming, IIterasmRNG
+public sealed class TestIterasmState(TestIterasmComponent comp) : IterasmState
 {
     private readonly TestIterasmComponent _comp = comp;
-    private readonly ISawmill _log = log;
 
-    IGameTiming IIterasmTiming.Timing => timing;
-    IRobustRandom IIterasmRNG.Random => random;
-
-    public override Func<VmState, long, bool>? CustomOps(string op) => op switch
+    public override IterasmOp? CustomOps(string op) => op switch
     {
         "emit" => Emit,
         "receiveb" => Receive,
         "receive" => TryReceive,
-        _ => ((IIterasmLogging) this).LoggingOps(op)
-            ?? ((IIterasmTiming) this).TimingOps(op)
-            ?? ((IIterasmRNG) this).RNGOps(op)
-            ?? base.CustomOps(op),
+        _ => base.CustomOps(op),
     };
 
     private bool Emit(VmState state, long args)
@@ -183,7 +175,7 @@ public sealed class TestIterasmState(IGameTiming timing, IRobustRandom random, I
 
         _comp.OutgoingQueue.Enqueue((port, value));
 
-        return true;
+        return false;
     }
 
     private bool Receive(VmState state, long args)
@@ -194,6 +186,7 @@ public sealed class TestIterasmState(IGameTiming timing, IRobustRandom random, I
         {
             _comp.CurrentState = ExecutionState.WaitingForSignal;
             _comp.RequestedRegister = reg;
+            return true; // Tells execution to stop.
         }
         else
         {
@@ -201,7 +194,7 @@ public sealed class TestIterasmState(IGameTiming timing, IRobustRandom random, I
             PutSignal(state, port, reg, value);
         }
 
-        return true;
+        return false;
     }
 
     private bool TryReceive(VmState state, long args)
@@ -219,7 +212,7 @@ public sealed class TestIterasmState(IGameTiming timing, IRobustRandom random, I
             PutSignal(state, port, reg, value);
         }
 
-        return true;
+        return false;
     }
 
     public static void PutSignal(VmState state, string port, ushort reg, long value)
@@ -232,12 +225,5 @@ public sealed class TestIterasmState(IGameTiming timing, IRobustRandom random, I
         state.Set(reg, value);
         state.Set((ushort) (reg + 1), (long) addr);
         state.Set((ushort) (reg + 2), utf8Len);
-    }
-
-    bool IIterasmLogging.LogCallback(VmState state, string? msg)
-    {
-        //TODO: The non-i `log` op just doesn't work...
-        _log.Debug($"Iterasm log: {msg}");
-        return true;
     }
 }
