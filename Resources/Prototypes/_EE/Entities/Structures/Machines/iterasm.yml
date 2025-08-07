@@ -3,7 +3,6 @@
   parent: BaseComputer
   id: TestIterasmMachine
   components:
-  # - type: TestIterasm
   - type: IterasmMachine
     tickSound:
       path: /Audio/Weapons/Guns/Empty/empty.ogg

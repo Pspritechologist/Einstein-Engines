@@ -15,7 +15,8 @@ public sealed partial class IterasmMachineSystem : EntitySystem
     [Dependency] private readonly SharedAudioSystem _audio = default!;
     [Dependency] private readonly PopupSystem _popupSystem = default!;
 
-    private static readonly TimeSpan MinTimePerTickSound = TimeSpan.FromMilliseconds(10);
+    // private static readonly TimeSpan MinTimePerTickSound = TimeSpan.FromMilliseconds(10);
+    private static readonly uint MaxTickSoundsPerFrame = 32u;
 
     public override void Initialize()
     {
@@ -38,6 +39,8 @@ public sealed partial class IterasmMachineSystem : EntitySystem
     {
         base.Update(frameTime);
 
+        UpdateLibraries(frameTime);
+
         var query = EntityQueryEnumerator<IterasmMachineActiveComponent>();
         while (query.MoveNext(out var ent, out var active))
         {
@@ -56,21 +59,21 @@ public sealed partial class IterasmMachineSystem : EntitySystem
 
             try
             {
-                var lastTickSoundInterval = TimeSpan.Zero;
-
                 for (var i = 0u; i < stepsToRun; i++)
                 {
-                    if (iterasm.TickSound is not null && _timing.CurTime - lastTickSoundInterval >= MinTimePerTickSound)
+                    if (iterasm.TickSound is not null && i < MaxTickSoundsPerFrame)
                     {
                         _audio.PlayPvs(iterasm.TickSound, ent);
-                        lastTickSoundInterval = _timing.CurTime;
                     }
 
-                    iterasm.State.Vm.RunStep();
-                    var ev = new IterasmMachineAfterTickEvent((ent, iterasm));
-                    RaiseLocalEvent(ent, ref ev);
-                    if (ev.StopExecution) break;
+                    // iterasm.State.Vm.RunStep();
+                    // var ev = new IterasmMachineAfterTickEvent((ent, iterasm));
+                    // RaiseLocalEvent(ent, ref ev);
+                    // if (ev.StopExecution) break;
                 }
+
+                if (iterasm.State.Vm.RunSteps(stepsToRun))
+                    StopExecution((ent, active));
             }
             catch (Iterasm.Binds.IterasmRuntimeErrorException e)
             {
