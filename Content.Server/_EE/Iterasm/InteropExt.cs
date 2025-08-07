@@ -55,8 +55,8 @@ public partial struct IterasmVm() : IDisposable
         NullC(state => Interop.IterasmVm_compile(state, src, custom_ops, hold_state).AsOkOrElse(static r => throw r.AsErr().Exception));
 
     public readonly void RunToCompletion() => NullC(static state => Interop.IterasmVm_run_to_completion(state).AsOkOrElse(static r => throw r.AsErr().Exception));
-    public readonly void RunStep() => NullC(static state => Interop.IterasmVm_run_step(state).AsOkOrElse(static r => throw r.AsErr().Exception));
-    public readonly void RunSteps(nuint steps) => NullC(state => Interop.IterasmVm_run_steps(state, steps).AsOkOrElse(static r => throw r.AsErr().Exception));
+    public readonly bool RunStep() => NullC(static state => Interop.IterasmVm_run_step(state).AsOkOrElse(static r => throw r.AsErr().Exception));
+    public readonly bool RunSteps(nuint steps) => NullC(state => Interop.IterasmVm_run_steps(state, steps).AsOkOrElse(static r => throw r.AsErr().Exception));
     public readonly void Reset() => NullC(static state => Interop.IterasmVm_reset(state).AsOkOrElse(static r => throw r.AsErr().Exception));
 
     public void Dispose()
