@@ -215,7 +215,11 @@ public sealed partial class IterasmMachineSystem : EntitySystem
         if (TryComp<IterasmAwaitingSignalComponent>(machine, out var awaiting))
         {
             var machineComp = Comp<IterasmMachineComponent>(machine);
-            PutSignal(machineComp.State.State, awaiting.DstRegister, (args.Port, value));
+
+            if (!machineComp.Iterasm.TryGetState(out var state))
+                return;
+
+            PutSignal(state, awaiting.DstRegister, (args.Port, value));
             RemComp(machine, awaiting);
             StartExecution((machine, machineComp));
             return;
@@ -226,7 +230,7 @@ public sealed partial class IterasmMachineSystem : EntitySystem
         machine.Comp.IncomingQueue.Enqueue((args.Port, value));
     }
 
-    public static void PutSignal(VmState state, ushort reg, (string port, long value)? signal)
+    public static void PutSignal(IterasmState state, ushort reg, (string port, long value)? signal)
     {
         if (signal is null)
         {

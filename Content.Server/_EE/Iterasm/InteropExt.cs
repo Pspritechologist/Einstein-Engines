@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Content.Server._EE.Iterasm.Binds;
 
 namespace Content.Server._EE.Iterasm.Binds;
 
@@ -40,12 +39,12 @@ public partial struct IterasmVm() : IDisposable
     public readonly bool IsInit => NullC(static state => Interop.IterasmVm_is_init(state).AsOkOrElse(static r => throw r.AsErr().Exception));
     public readonly bool HasHeldState => NullC(static state => Interop.IterasmVm_has_held_state(state).AsOkOrElse(static r => throw r.AsErr().Exception));
     // Need C# 13 for ref structs to not be awful here :(
-    public readonly VmState State
+    public readonly IterasmState State
     {
         get
         {
             ObjectDisposedException.ThrowIf(_state == IntPtr.Zero, this);
-            return new VmState(Interop.IterasmVm_get_state(_state).AsOkOrElse(static r => throw r.AsErr().Exception));
+            return new IterasmState(Interop.IterasmVm_get_state(_state).AsOkOrElse(static r => throw r.AsErr().Exception));
         }
     }
 
@@ -56,7 +55,12 @@ public partial struct IterasmVm() : IDisposable
 
     public readonly void RunToCompletion() => NullC(static state => Interop.IterasmVm_run_to_completion(state).AsOkOrElse(static r => throw r.AsErr().Exception));
     public readonly bool RunStep() => NullC(static state => Interop.IterasmVm_run_step(state).AsOkOrElse(static r => throw r.AsErr().Exception));
-    public readonly bool RunSteps(nuint steps) => NullC(state => Interop.IterasmVm_run_steps(state, steps).AsOkOrElse(static r => throw r.AsErr().Exception));
+    public readonly bool RunSteps(ulong steps, out ulong stepsRun)
+    {
+        var res = NullC(state => Interop.IterasmVm_run_steps(state, steps).AsOkOrElse(static r => throw r.AsErr().Exception));
+        stepsRun = res.steps_run;
+        return res.done;
+    }
     public readonly void Reset() => NullC(static state => Interop.IterasmVm_reset(state).AsOkOrElse(static r => throw r.AsErr().Exception));
 
     public void Dispose()
@@ -82,9 +86,9 @@ public partial struct Error
                 return AsRuntime().Exception;
 
             if (IsUninitializedVm)
-                return new InvalidOperationException("Uninitialized VM state.");
+                return new IterasmNotInitException();
             if (IsNoHeldState)
-                return new InvalidOperationException("No held state.");
+                return new IterasmNoStateHeldException();
 
             if (IsCompilation)
                 return new CompilationException(AsCompilation());
@@ -151,85 +155,6 @@ public partial struct RuntimeError
             throw new InteropException();
         }
     }
-}
-
-public sealed class CompilationException(CompilationError e) : Exception()
-{
-    public CompilationErrorKind.CompilationErrorKindEnum Kind => e.kind;
-    public nuint ErrorLine => e.line;
-}
-
-public abstract class IterasmRuntimeErrorException(nuint line) : Exception
-{
-    public nuint Line = line;
-}
-
-public sealed class IterasmRuntimeProjectCounterOverflowException(nuint line, nuint pc, nuint bc) : IterasmRuntimeErrorException(line)
-{
-    public nuint Pc = pc;
-    public nuint Bc = bc;
-}
-
-public sealed class IterasmRuntimeStackIndexOutOfBoundsException(nuint line, ushort index, nuint frame_size) : IterasmRuntimeErrorException(line)
-{
-    public ushort Index = index;
-    public nuint FrameSize = frame_size;
-}
-
-public sealed class IterasmRuntimeEntArgsUnderflowException(nuint line, ushort requested, ushort found) : IterasmRuntimeErrorException(line)
-{
-    public ushort Requested = requested;
-    public ushort Found = found;
-}
-
-public sealed class IterasmRuntimeEntArgsOverflowException(nuint line, ushort requested, ushort space) : IterasmRuntimeErrorException(line)
-{
-    public ushort Requested = requested;
-    public ushort Space = space;
-}
-
-public sealed class IterasmRuntimeExitFromEmptyFrameException(nuint line) : IterasmRuntimeErrorException(line)
-{ }
-
-public sealed class IterasmRuntimeExitArgsOverflowException(nuint line, ushort requested, ushort space) : IterasmRuntimeErrorException(line)
-{
-    public ushort Requested = requested;
-    public ushort Space = space;
-}
-
-public sealed class IterasmRuntimeExitArgsUnderflowException(nuint line, ushort requested, ushort found) : IterasmRuntimeErrorException(line)
-{
-    public ushort Requested = requested;
-    public ushort Found = found;
-}
-
-public sealed class IterasmRuntimeUnterminatedFormatStringException(nuint line) : IterasmRuntimeErrorException(line)
-{ }
-
-public sealed class IterasmRuntimeHeapAddrOutOfBoundsException(nuint line, ulong addr, ulong bounds) : IterasmRuntimeErrorException(line)
-{
-    public ulong Addr = addr;
-    public ulong Bounds = bounds;
-}
-
-public sealed class IterasmRuntimeHeapRangeOutOfBoundsException(nuint line, ulong addr, ulong len, ulong bounds) : IterasmRuntimeErrorException(line)
-{
-    public ulong Addr = addr;
-    public ulong Len = len;
-    public ulong Bounds = bounds;
-}
-
-public sealed class IterasmRuntimeHeapAccessAfterFreeException(nuint line, ulong addr) : IterasmRuntimeErrorException(line)
-{
-    public ulong Addr = addr;
-}
-
-public sealed class IterasmRuntimeHeapAccessNullAddrException(nuint line) : IterasmRuntimeErrorException(line)
-{ }
-
-public sealed class IterasmRuntimeHeapAllocOverflowException(nuint line, ulong size) : IterasmRuntimeErrorException(line)
-{
-    public ulong Size = size;
 }
 
 #endregion

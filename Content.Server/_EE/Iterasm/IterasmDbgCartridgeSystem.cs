@@ -47,22 +47,17 @@ public sealed class IterasmDbgCartridgeSystem : EntitySystem
 
         if (ent.Comp.ProgramTarget is not { } machine)
         {
-            // _audio.PlayPvs(new SoundPathSpecifier("/Audio/Effects/double_beep.ogg"), ent.Owner);
             _loader.SendNotification(GetEntity(msg.LoaderUid), "IterasmDebugger", "No machine connected to program.");
             return;
         }
 
-        try { machine.Comp.State.Compile(msg.Program); }
-        catch (Binds.CompilationException e)
+        if (!_iterasmMachine.CompileProgram(machine!, msg.Program, out var error))
         {
-            // _audio.PlayPvs(new SoundPathSpecifier("/Audio/Effects/double_beep.ogg"), ent.Owner);
-            _loader.SendNotification(GetEntity(msg.LoaderUid), "Compilation Error", e.Message);
-
-            SetUiStateError(GetEntity(msg.LoaderUid), e.Message, (uint) e.ErrorLine);
+            _loader.SendNotification(GetEntity(msg.LoaderUid), "Compilation Error", error.Message);
+            SetUiStateError(GetEntity(msg.LoaderUid), error.Message, (uint) error.ErrorLine);
             return;
         }
 
-        // _audio.PlayPvs(new SoundPathSpecifier("/Audio/Effects/beep_landmine.ogg"), ent.Owner);
         _loader.SendNotification(GetEntity(msg.LoaderUid), "Compilation Success", "Program compiled successfully.");
         _iterasmMachine.StartExecution(machine!);
     }
@@ -78,13 +73,11 @@ public sealed class IterasmDbgCartridgeSystem : EntitySystem
 
         if (ent.Comp.ProgramTarget == machine!)
         {
-            // _audio.PlayPvs(new SoundPathSpecifier("/Audio/Effects/beep1.ogg"), ent.Owner);
             _loader.SendNotification(args.Loader, "IterasmDebugger", $"Disconnected from /dev/{machine.Owner}.");
             ent.Comp.ProgramTarget = null;
             return;
         }
 
-        // _audio.PlayPvs(new SoundPathSpecifier("/Audio/Effects/beep1.ogg"), ent.Owner);
         _loader.SendNotification(args.Loader, "IterasmDebugger", $"Debugger connected to /dev/{machine.Owner}.");
         ent.Comp.ProgramTarget = machine!;
     }

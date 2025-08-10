@@ -6,10 +6,8 @@
   - type: IterasmMachine
     tickSound:
       path: /Audio/Weapons/Guns/Empty/empty.ogg
-      params:
-        volume: 0.5
-    errorSound:
-      path: /Audio/Items/Defib/defib_failed.ogg
+      params: { volume: 0.5 }
+    errorSound: { path: /Audio/Items/Defib/defib_failed.ogg }
   - type: IterasmLogLib
   - type: IterasmMachineDefaultProgrammed
     program: |
@@ -33,15 +31,6 @@
       jmpif timer2 0
 
       jmp loop
-
-  - type: Paper
-  - type: ActivatableUI
-    key: enum.PaperUiKey.Key
-    requiresComplex: false
-  - type: UserInterface
-    interfaces:
-      enum.PaperUiKey.Key:
-        type: PaperBoundUserInterface
 
   - type: DeviceLinkSink
     ports:

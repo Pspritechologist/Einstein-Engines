@@ -24,11 +24,12 @@ public sealed partial class IterasmMachineComponent : Component, IDisposable
 
     public Dictionary<string, (string docs, IterasmOp op)> Ops = new();
 
-    public IterasmMachineState State = default!;
+    [Access(friends: typeof(IterasmMachineSystem))]
+    public IterasmMachineState Iterasm = default!;
 
     public void Dispose()
     {
-        State?.Dispose();
-        State = null!;
+        Iterasm?.Dispose();
+        Iterasm = null!;
     }
 }
