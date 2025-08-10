@@ -1,5 +1,3 @@
-using Content.Server.MachineLinking.Events;
-using Content.Server.MachineLinking.System;
 using Content.Server.Power.Components;
 using Robust.Shared.Audio;
 using Robust.Shared.Player;
@@ -8,13 +6,17 @@ using Content.Server.Sound.Components;
 using Content.Shared.Sound.Components;
 using Content.Shared.Interaction;
 using Robust.Shared.Timing;
+using Robust.Shared.Audio.Systems;
+using Content.Server.DeviceLinking.Systems;
+using Content.Server.DeviceLinking.Events;
 
 namespace Content.Server.SimpleStation14.LoudSpeakers;
 
 public sealed class DoorSignalControlSystem : EntitySystem
 {
-    [Dependency] private readonly SignalLinkerSystem _signal = default!;
+    [Dependency] private readonly DeviceLinkSystem _signal = default!;
     [Dependency] private readonly SharedAudioSystem _audio = default!;
+    [Dependency] private readonly SharedContainerSystem _container = default!;
     [Dependency] private readonly IGameTiming _timing = default!;
 
     public override void Initialize()
@@ -31,14 +33,14 @@ public sealed class DoorSignalControlSystem : EntitySystem
 
     private void OnShutdown(EntityUid uid, LoudSpeakerComponent component, ComponentShutdown args)
     {
-        if (component.CurrentPlayingSound != null)
-            component.CurrentPlayingSound.Stop();
+        if (component.CurrentPlayingSound is { } soundEnt)
+            _audio.Stop(soundEnt.Owner, soundEnt.Comp);
     }
 
     private void OnInit(EntityUid uid, LoudSpeakerComponent component, ComponentInit args)
     {
         if (component.Ports)
-            _signal.EnsureReceiverPorts(uid, component.PlaySoundPort);
+            _signal.EnsureSinkPorts(uid, component.PlaySoundPort);
     }
 
     /// <summary>
@@ -47,46 +49,45 @@ public sealed class DoorSignalControlSystem : EntitySystem
     /// <param name="uid">The Loudspeaker to play.</param>
     /// <param name="component">The Loudspeaker component.</param>
     /// <returns>True if the Loudspeaker was played, false otherwise.</returns>
-    public bool TryPlayLoudSpeaker(EntityUid uid, LoudSpeakerComponent? component = null)
+    public bool TryPlayLoudSpeaker(Entity<LoudSpeakerComponent?> ent)
     {
-        if (!Resolve(uid, ref component))
+        if (!Resolve(ent, ref ent.Comp))
             return false;
 
-        if (component.NextPlayTime > _timing.CurTime)
+        if (ent.Comp.NextPlayTime > _timing.CurTime)
             return false;
 
-        if (TryComp<ApcPowerReceiverComponent>(uid, out var powerComp) && !powerComp.Powered)
+        if (TryComp<ApcPowerReceiverComponent>(ent, out var powerComp) && !powerComp.Powered)
             return false;
 
-        PlayLoudSpeaker(uid, component, GetSpeakerSound(uid, component));
+        PlayLoudSpeaker(ent!, GetSpeakerSound(ent!));
 
         return true;
     }
 
-    private void PlayLoudSpeaker(EntityUid uid, LoudSpeakerComponent component, SoundSpecifier sound)
+    private void PlayLoudSpeaker(Entity<LoudSpeakerComponent> ent, SoundSpecifier sound)
     {
         var newParams = sound.Params
-            .WithVolume(sound.Params.Volume * component.VolumeMod)
-            .WithMaxDistance(sound.Params.MaxDistance * component.RangeMod)
-            .WithRolloffFactor(sound.Params.RolloffFactor * component.RolloffMod)
-            .WithVariation((sound.Params.Variation !> 0 ? component.DefaultVariance : sound.Params.Variation) * component.VarianceMod);
+            .WithVolume(sound.Params.Volume * ent.Comp.VolumeMod)
+            .WithMaxDistance(sound.Params.MaxDistance * ent.Comp.RangeMod)
+            .WithRolloffFactor(sound.Params.RolloffFactor * ent.Comp.RolloffMod)
+            .WithVariation((sound.Params.Variation is { } and > 0 ? ent.Comp.DefaultVariance : sound.Params.Variation) * ent.Comp.VarianceMod);
 
-        if (component.Interrupt && component.CurrentPlayingSound != null)
-            component.CurrentPlayingSound.Stop();
+        if (ent.Comp.Interrupt && ent.Comp.CurrentPlayingSound is { } soundEnt)
+            _audio.Stop(soundEnt.Owner, soundEnt.Comp);
 
-        component.NextPlayTime = _timing.CurTime + component.Cooldown;
+        ent.Comp.NextPlayTime = _timing.CurTime + ent.Comp.Cooldown;
 
-        component.CurrentPlayingSound = _audio.Play(sound, Filter.Pvs(uid, component.RangeMod), uid, true, newParams);
+        ent.Comp.CurrentPlayingSound = _audio.PlayEntity(sound, Filter.Pvs(ent, ent.Comp.RangeMod), ent, true, newParams);
     }
 
-    private SoundSpecifier GetSpeakerSound(EntityUid uid, LoudSpeakerComponent component)
+    private SoundSpecifier GetSpeakerSound(Entity<LoudSpeakerComponent> ent)
     {
-        if (!TryComp<ContainerManagerComponent>(uid, out var containerManager) ||
-            !containerManager.TryGetContainer(component.ContainerSlot, out var container))
-            return component.DefaultSound;
+        if (!_container.TryGetContainer(ent, ent.Comp.ContainerSlot, out var container))
+            return ent.Comp.DefaultSound;
 
         if (container.ContainedEntities.Count == 0)
-            return component.DefaultSound;
+            return ent.Comp.DefaultSound;
 
         var entity = container.ContainedEntities[0];
 
@@ -108,24 +109,22 @@ public sealed class DoorSignalControlSystem : EntitySystem
                 return land.Sound;
 
             default:
-                return component.DefaultSound;
+                return ent.Comp.DefaultSound;
         }
     }
 
-    private void OnSignalReceived(EntityUid uid, LoudSpeakerComponent component, SignalReceivedEvent args)
+    private void OnSignalReceived(Entity<LoudSpeakerComponent> ent, ref SignalReceivedEvent args)
     {
-        if (args.Port == component.PlaySoundPort)
-        {
-            TryPlayLoudSpeaker(uid, component);
-        }
+        if (args.Port == ent.Comp.PlaySoundPort)
+            TryPlayLoudSpeaker(ent!);
     }
 
-    private void OnInteractHand(EntityUid uid, LoudSpeakerComponent component, InteractHandEvent args)
+    private void OnInteractHand(Entity<LoudSpeakerComponent> ent, ref InteractHandEvent args)
     {
-        if (!component.TriggerOnInteract)
+        if (!ent.Comp.TriggerOnInteract)
             return;
 
-        if (!TryPlayLoudSpeaker(uid, component))
+        if (!TryPlayLoudSpeaker(ent!))
             return;
 
         args.Handled = true;

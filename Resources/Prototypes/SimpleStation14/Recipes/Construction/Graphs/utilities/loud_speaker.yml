@@ -54,7 +54,7 @@
       edges:
         - to: payload
           steps:
-            - size: 8
+            - maxSize: Small
               store: payload
               name: "payload"
               compBlacklist: ["Tool"]

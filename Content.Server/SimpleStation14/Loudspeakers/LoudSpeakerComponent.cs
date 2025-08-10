@@ -1,11 +1,12 @@
 using Robust.Shared.Audio;
+using Robust.Shared.Audio.Components;
 
 namespace Content.Server.SimpleStation14.LoudSpeakers;
 
 [RegisterComponent]
-public sealed class LoudSpeakerComponent : Component
+public sealed partial class LoudSpeakerComponent : Component
 {
-    public IPlayingAudioStream? CurrentPlayingSound;
+    public Entity<AudioComponent>? CurrentPlayingSound;
 
     public TimeSpan NextPlayTime = TimeSpan.Zero;
 
